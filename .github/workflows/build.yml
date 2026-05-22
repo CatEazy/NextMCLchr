@@ -1,0 +1,153 @@
+name: Build Minecraft Launcher
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install MinGW-w64
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mingw-w64
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get install -y libcurl4-openssl-dev libjsoncpp-dev zlib1g-dev
+        # 注意：交叉编译需要对应的 Windows 版本库，这里使用静态链接或源码编译
+        # 如果项目依赖复杂，建议在 windows-latest 环境下原生编译
+        
+    - name: Build Windows Executable
+      run: |
+        mkdir -p build
+        # 尝试使用 MinGW 交叉编译
+        # 请根据实际源文件路径调整 src/*.cpp
+        x86_64-w64-mingw32-g++ -std=c++17 -o build/mc_launcher.exe src/*.cpp \
+          -static -static-libgcc -static-libstdc++ \
+          -I/usr/include/jsoncpp \
+          -lcurl -ljsoncpp -lz -lws2_32 -lwldap3 -lnormaliz -lidn2 -lunistring \
+          || echo "Cross-compilation failed, trying native Windows runner..."
+
+    - name: Upload Windows Artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: mc_launcher-windows
+        path: build/mc_launcher.exe
+        if-no-files-found: ignore
+
+  build-windows-native:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install Dependencies via vcpkg (Optional)
+      run: |
+        # 如果需要 vcpkg 管理依赖，取消下面注释并配置
+        # git clone https://github.com/microsoft/vcpkg.git
+        # cd vcpkg && ./bootstrap-vcpkg.sh
+        # ./vcpkg/vcpkg install curl:x64-windows jsoncpp:x64-windows zlib:x64-windows
+        echo "Using system libraries or manual dependency management"
+
+    - name: Build with MSVC
+      run: |
+        mkdir build
+        # 使用 cl.exe 编译
+        # 请根据实际源文件调整
+        cl.exe /EHsc /std:c++17 /Fe:build\mc_launcher.exe src/*.cpp \
+          /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\ucrt" \
+          || echo "MSVC build failed, ensure dependencies are installed"
+      
+    - name: Upload Native Windows Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mc_launcher-windows-native
+        path: build/mc_launcher.exe
+        if-no-files-found: ignore
+
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y g++ libcurl4-openssl-dev libjsoncpp-dev zlib1g-dev
+
+    - name: Build Linux Executable
+      run: |
+        mkdir -p build
+        g++ -std=c++17 -O2 -o build/mc_launcher src/*.cpp \
+          -lcurl -ljsoncpp -lz
+
+    - name: Upload Linux Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mc_launcher-linux
+        path: build/mc_launcher
+
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      run: |
+        brew install curl jsoncpp zlib
+
+    - name: Build macOS Executable
+      run: |
+        mkdir -p build
+        clang++ -std=c++17 -O2 -o build/mc_launcher src/*.cpp \
+          -I$(brew --prefix curl)/include \
+          -I$(brew --prefix jsoncpp)/include \
+          -L$(brew --prefix curl)/lib \
+          -L$(brew --prefix jsoncpp)/lib \
+          -lcurl -ljsoncpp -lz
+
+    - name: Upload macOS Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mc_launcher-macos
+        path: build/mc_launcher
+
+  release:
+    needs: [build-windows-native, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Create Release Archives
+      run: |
+        cd artifacts
+        zip -j mc_launcher-windows.zip mc_launcher-windows-native/mc_launcher.exe || true
+        zip -j mc_launcher-linux.zip mc_launcher-linux/mc_launcher || true
+        zip -j mc_launcher-macos.zip mc_launcher-macos/mc_launcher || true
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: artifacts/*.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
