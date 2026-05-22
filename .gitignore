@@ -1,46 +1,4 @@
 ```
-# Build artifacts
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.a
-*.out
-
-# CMake build directory
-build/
-
-# Dependencies
-venv/
-.venv/
-__pycache__/
-*.egg-info/
-dist/
-target/
-.gradle/
-
-# Editor/IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# Logs
-*.log
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# OS files
-.DS_Store
-Thumbs.db
+# CI/CD
+.github/workflows/
 ```
