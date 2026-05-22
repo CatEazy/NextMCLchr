@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <memory>
+#include <cstring>
 
 #ifdef _WIN32
     #include <windows.h>
