@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace mc_launcher {
 
@@ -34,6 +35,8 @@ public:
     std::string getDefaultJavaPath();
 
 private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
     std::vector<JavaInstallation> searchRegistry();  // Windows only
     std::vector<JavaInstallation> searchCommonPaths();
     bool validateJavaExecutable(const std::string& path);

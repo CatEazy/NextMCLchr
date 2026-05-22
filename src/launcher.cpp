@@ -8,6 +8,7 @@
 #include <thread>
 #include <chrono>
 #include <cstdlib>
+#include <sys/stat.h>
 
 #ifdef _WIN32
     #include <windows.h>
